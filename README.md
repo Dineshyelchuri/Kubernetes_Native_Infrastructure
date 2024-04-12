@@ -6,7 +6,7 @@ This repository contains all sub repositories created during the kubernetes Nati
 
 # Tech Stack
 
-1)Node js for web application
+1) Node js for web application
 
 2) Golang for writing Kubernetes Operator
    
