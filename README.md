@@ -4,7 +4,7 @@
 
 This repository contains all sub repositories created during the kubernetes Native Infrastructure project 
 
-#Tech Stack
+# Tech Stack
 
 1)Node js for web application
 
