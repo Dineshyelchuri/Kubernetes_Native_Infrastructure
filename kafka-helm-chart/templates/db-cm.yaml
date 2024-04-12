@@ -1,0 +1,10 @@
+apiVersion: v1
+data:
+  POSTGRES_HOST: {{ .Release.Name }}-postgresql-0.{{ .Release.Name }}-postgresql-hl.{{ .Release.Namespace }}.svc.cluster.local
+  POSTGRES_DB: {{ .Values.postgresql.auth.database }}
+  KAFKA_SERVER: {{ .Release.Name }}-kafka.{{ .Release.Namespace }}.svc.cluster.local:9092
+#   KAFKA_SERVER: {{ .Release.Name }}-kafka-controller-0.{{ .Release.Name }}-kafka-controller-headless.{{ .Release.Namespace }}.svc.cluster.local:9092
+  KAFKA_USER: user1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-kafka-db-cm

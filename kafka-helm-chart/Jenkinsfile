@@ -1,0 +1,69 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    git branch: 'main',
+                    credentialsId: 'jenkinaccesstoken',
+                    url: 'https://github.com/cyse7125-fall2023-group06/kafka-helm-chart.git'
+                }
+            }
+        }
+
+        stage('release') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'jenkinaccesstoken', usernameVariable: 'githubUsername', passwordVariable: 'githubToken')]) {
+                        withEnv(["GH_TOKEN=${githubToken}"]){
+                        env.GIT_LOCAL_BRANCH='main'
+                            sh "rm -f kafka-helm-chart.tgz"
+                            sh "rm -rf kafka-helm-chart"
+                            sh "npx semantic-release"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Helm Chart') {
+            steps {
+                script {
+                    withCredentials([file(credentialsId: 'ddaf7e0d-de8c-4e76-9d9b-8f55ca939b15', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                        sh "gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS"
+                        sh "gcloud config set project \$(gcloud projects list --format='value(project_id)' --filter='project_id~^kubernetes-.*')"
+                        sh "gcloud container clusters get-credentials my-gke-cluster --region us-east1"
+                    }
+                    withCredentials([usernamePassword(credentialsId: 'jenkinaccesstoken', usernameVariable: 'githubUsername', passwordVariable: 'githubToken')]) {
+                        sh "rm -f kafka-helm-chart.tgz"
+                        sh "rm -rf kafka-helm-chart"
+                        def helm_download_link = sh(script: """curl -s "https://api.github.com/repos/cyse7125-fall2023-group06/kafka-helm-chart/releases/latest" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $githubToken" -H "X-GitHub-Api-Version: 2022-11-28" | grep -oP '"url": "\\K[^"]+' | grep "https://api.github.com/repos/cyse7125-fall2023-group06/kafka-helm-chart/releases/assets/*" | tr -d '\n'""", returnStdout: true).trim()
+                        sh "wget --auth-no-challenge --header='Accept:application/octet-stream' $helm_download_link --header='Authorization:token $githubToken' -O kafka-helm-chart.tgz"
+                        sh "tar -xzvf kafka-helm-chart.tgz"                        
+                    }
+                    withCredentials([usernamePassword(credentialsId: 'kafka-db', passwordVariable: 'DB_PASSWORD', usernameVariable: 'DB_USERNAME')]) {                        
+                        withCredentials([usernamePassword(credentialsId: 'quay', passwordVariable: 'QUAY_PASSWORD', usernameVariable: 'QUAY_USERNAME')]) {
+                            withCredentials([usernamePassword(credentialsId: 'kafka-cred', passwordVariable: 'KAFKA_PASSWORD', usernameVariable: 'KAFKA_USERNAME')]) {
+                                def customValues = "postgresql.auth.username=$DB_USERNAME,postgresql.auth.password=$DB_PASSWORD,regcred.username=$QUAY_USERNAME,regcred.password=$QUAY_PASSWORD,kafka.sasl.client.passwords=$KAFKA_PASSWORD"  
+                                sh "kubectl create ns kafka --dry-run=client -o yaml | kubectl apply -f -"
+                                sh "kubectl label ns kafka istio-injection=enabled"
+                                sh "helm upgrade --install nag ./kafka-helm-chart -n kafka --set $customValues"
+                            }
+                        }
+                    }                    
+                }
+            }
+        }
+
+        stage('post-release') {
+            steps {
+                script 
+                {
+                    sh 'gcloud auth revoke'
+                    sh 'echo "Done deployment."'
+                }
+            }
+        }
+    }
+}

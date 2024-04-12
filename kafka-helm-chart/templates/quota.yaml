@@ -1,0 +1,10 @@
+# apiVersion: v1
+# kind: ResourceQuota
+# metadata:
+#   name: {{ .Release.Name }}-{{ .Release.Namespace }}-quota
+# spec:
+#   hard:
+#     requests.cpu: {{ .Values.quota.cpuRequests }}
+#     requests.memory: {{ .Values.quota.memoryRequests }}
+#     limits.cpu: {{ .Values.quota.cpuLimits }}
+#     limits.memory: {{ .Values.quota.memoryLimits }}

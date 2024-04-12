@@ -1,0 +1,84 @@
+# Default values for kafka-helm-chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+kafka:
+  controller:
+    replicaCount: 3
+  # broker:
+  #   replicaCount: 1
+  provisioning:
+    enabled: true
+    numPartitions: 3
+    topics:
+    - name: healthcheck
+      partitions: 3
+      replicationFactor: 1
+    podAnnotations:
+      sidecar.istio.io/inject: "false"
+    serviceAccount:
+      automountServiceAccountToken: false
+    resources:
+      limits:
+        memory: "128Mi"
+        cpu: "0.1"
+      requests:
+        memory: "64Mi"
+        cpu: 10m
+  sasl:
+    client:
+      users:
+      - user1
+      passwords: ""
+
+postgresql:
+  auth:
+    username: ""
+    password: ""
+    database: kafka
+  networkPolicy:
+    enabled: true
+    ingressRules:
+      primaryAccessOnlyFrom:
+        enabled: true
+        podSelector:
+          app: nag-kafka-consumer-deploy
+    egressRules:
+      denyConnectionsToExternal: true
+
+kafkaconsumer:
+  image: quay.io/csye7125ruth/kafka-consumer:latest
+
+deployment:
+  replicaCount: 1
+  minReadySeconds: 30
+  progressDeadlineSeconds: 40
+  strategy:
+    type: RollingUpdate
+    maxSurge: 1
+    maxUnavailable: 0
+  limits:
+    memoryLimit: "256Mi"
+    cpuLimit: "0.2"
+  requests:
+    memoryRequest: "128Mi"
+    cpuRequest: "0.1"
+  
+
+regcred:
+  username: ""
+  password: ""
+
+defaultLimits:
+  cpu: 1000m
+  memory: 1Gi
+defaultRequests:
+  cpu: 10m
+  memory: 64Mi
+
+quota:
+  cpuRequests: 10
+  memoryRequests: 12Gi
+  cpuLimits: 20
+  memoryLimits: 24Gi
+  

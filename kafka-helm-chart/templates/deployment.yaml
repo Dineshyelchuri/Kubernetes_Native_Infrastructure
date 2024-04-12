@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Release.Name }}-kafka-consumer-deploy
+  name: {{ .Release.Name }}-kafka-consumer-deploy
+spec:
+  replicas: {{ .Values.deployment.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-kafka-consumer-deploy
+  minReadySeconds: {{ .Values.deployment.minReadySeconds }}
+  progressDeadlineSeconds: {{ .Values.deployment.progressDeadlineSeconds }}
+  strategy: 
+    type: {{ .Values.deployment.strategy.type }}
+    {{- if eq .Values.deployment.strategy.type "RollingUpdate" }}
+    rollingUpdate:
+      maxSurge: {{ .Values.deployment.strategy.maxSurge }}
+      maxUnavailable: {{ .Values.deployment.strategy.maxUnavailable }}
+    {{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-kafka-consumer-deploy
+    spec:
+      automountServiceAccountToken: false
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - {{ .Release.Name }}-kafka-consumer-deploy
+                topologyKey: topology.kubernetes.io/zone
+      initContainers:
+      - name: sleep
+        image: busybox
+        command: ["/bin/sh", "-c", "sleep 20"]
+      containers:
+      - name: kafka-consumer
+        image: {{ .Values.kafkaconsumer.image }}
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: {{ .Values.deployment.limits.memoryLimit }}
+            cpu: {{ .Values.deployment.limits.cpuLimit }}
+          requests:
+            memory: {{ .Values.deployment.requests.memoryRequest }}
+            cpu: {{ .Values.deployment.requests.cpuRequest }}
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-kafka-db-cred
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-kafka-db-cred
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: {{ .Release.Name }}-kafka-db-cm
+              key: POSTGRES_DB
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: {{ .Release.Name }}-kafka-db-cm
+              key: POSTGRES_HOST
+        - name: KAFKA_USER
+          valueFrom:
+            configMapKeyRef:
+              name: {{ .Release.Name }}-kafka-db-cm
+              key: KAFKA_USER
+        - name: KAFKA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-kafka-user-passwords
+              key: client-passwords
+        - name: KAFKA_SERVER
+          valueFrom:
+            configMapKeyRef:
+              name: {{ .Release.Name }}-kafka-db-cm
+              key: KAFKA_SERVER
+      imagePullSecrets:
+      - name: {{ .Release.Name }}-kafka-reg-cred

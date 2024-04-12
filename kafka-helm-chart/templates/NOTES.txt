@@ -1,0 +1,32 @@
+Thank you for installing {{ .Chart.Name }} chart.
+Your release is named {{ .Release.Name }}.
+
+To learn more about the release, try:
+  $ helm status {{ .Release.Name }}
+  $ helm get all {{ .Release.Name }}
+
+To Uninstall the chart, try
+  $ helm uninstall {{ .Release.Name }}
+
+Please wait a few seconds until the {{ .Chart.Name }} chart is fully installed.
+
+This helm chart installs all the necessary kubernetes objects required to run the kafka cluster.
+
+This Kafka helm chart also installs necessary kubernetes objects required to run the kafka consumer which reads the data from the healthcheck topic and writes to the Postgresql database.
+
+Following Options Need to be passed when Installing/Upgrading the chart:
+ $ postgresql.auth.username=$DB_USERNAME
+ $ postgresql.auth.password=$DB_PASSWORD
+ $ regcred.username=$QUAY_USERNAME
+ $regcred.password=$QUAY_PASSWORD
+ $kafka.sasl.client.passwords=$KAFKA_PASSWORD
+
+Else, the values.yaml file can be updated with all the above required fields.
+
+Command to install/upgrade the chart is:
+  $ helm upgrade --install nag ./kafka-helm-chart -n kafka --set postgresql.auth.username=$DB_USERNAME,postgresql.auth.password=$DB_PASSWORD,regcred.username=$QUAY_USERNAME,regcred.password=$QUAY_PASSWORD
+
+Override the following value in values.yaml to set a custom password for Kafka.
+ $ kafka.sasl.client.passwords=$KAFKA_PASSWORD
+
+The client, broker passwords can be found in {{ .Release.Name }}-kafka-user-passwords.
