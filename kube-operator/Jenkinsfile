@@ -1,0 +1,71 @@
+pipeline {
+    agent any
+    tools {
+        go '1.20'
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    git branch: 'main',
+                    credentialsId: 'jenkinaccesstoken',
+                    url: 'https://github.com/cyse7125-fall2023-group06/kube-operator.git'
+                }
+            }
+        }
+
+        stage('release') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'jenkinaccesstoken', usernameVariable: 'githubUsername', passwordVariable: 'githubToken')]) {
+                        withEnv(["GH_TOKEN=${githubToken}"]){
+                            env.GIT_LOCAL_BRANCH='main'
+                            sh "npx semantic-release"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build and Push Docker Image') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'quay', passwordVariable: 'QUAY_PASSWORD', usernameVariable: 'QUAY_USERNAME')]) {
+                        def latestTag = sh(script: 'git describe --tags --abbrev=0', returnStdout: true).trim()
+                        sh "docker login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io" 
+                        sh "make docker-build docker-push IMG=quay.io/csye7125ruth/hc-controller:$latestTag"
+                    }
+                }
+            }
+        }
+        stage('Configure gcloud and deploy the controller') {
+            steps {
+                script {
+                    withCredentials([file(credentialsId: 'ddaf7e0d-de8c-4e76-9d9b-8f55ca939b15', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                        def latestTag = sh(script: 'git describe --tags --abbrev=0', returnStdout: true).trim()
+                        sh "gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS"
+                        sh "gcloud config set project \$(gcloud projects list --format='value(project_id)' --filter='project_id~^kubernetes-.*')"
+                        sh "gcloud container clusters get-credentials my-gke-cluster --region us-east1"
+                        sh "make deploy IMG=quay.io/csye7125ruth/hc-controller:$latestTag"
+                        sh "kubectl label ns kube-operator-system istio-injection=enabled"
+                    }
+                    withCredentials([usernamePassword(credentialsId: 'kafka-cred', passwordVariable: 'KAFKA_PASSWORD', usernameVariable: 'KAFKA_USERNAME')]) {
+                        sh "kubectl create secret generic kafka-user-passwords --from-literal=client-passwords=$KAFKA_PASSWORD -n kube-operator-system --dry-run=client -o yaml | kubectl apply -f -"
+                    }
+                    withCredentials([usernamePassword(credentialsId: 'quay', passwordVariable: 'QUAY_PASSWORD', usernameVariable: 'QUAY_USERNAME')]) {
+                        sh "kubectl create secret docker-registry reg-cred --docker-server=quay.io --docker-email=nbabu724@gmail.com --docker-username=$QUAY_USERNAME --docker-password=$QUAY_PASSWORD -n kube-operator-system --dry-run=client -o yaml | kubectl apply -f -"
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            withCredentials([usernamePassword(credentialsId: 'quay', passwordVariable: 'QUAY_PASSWORD', usernameVariable: 'QUAY_USERNAME')]) {
+                        sh 'docker logout $QUAY_USERNAME'
+                        sh 'gcloud auth revoke'
+            }
+        }
+    }
+}

@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: webapp-role
+rules:
+- apiGroups:
+  - webapp.kube.hellodocker.com
+  resources:
+  - healthchecks
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - delete

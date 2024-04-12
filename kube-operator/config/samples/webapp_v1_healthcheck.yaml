@@ -1,0 +1,17 @@
+apiVersion: webapp.kube.hellodocker.com/v1
+kind: HealthCheck
+metadata:
+  labels:
+    app.kubernetes.io/name: healthcheck
+    app.kubernetes.io/instance: healthcheck-sample
+    app.kubernetes.io/part-of: kube-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kube-operator
+  name: healthcheck-sample
+spec:
+  checkName: nagbabu
+  expectedStatusCode: 400
+  interval: 1
+  isPaused: false
+  retries: 5
+  uri: hello.com

@@ -1,0 +1,83 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+  name: healthchecks.webapp.kube.hellodocker.com
+spec:
+  group: webapp.kube.hellodocker.com
+  names:
+    kind: HealthCheck
+    listKind: HealthCheckList
+    plural: healthchecks
+    shortNames:
+    - hc
+    singular: healthcheck
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: HealthCheck is the Schema for the healthchecks API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HealthCheckSpec defines the desired state of HealthCheck
+            properties:
+              checkName:
+                description: CheckName is the name of the health check
+                type: string
+              expectedStatusCode:
+                description: ExpectedStatusCode is the expected HTTP status code
+                type: integer
+              interval:
+                description: Interval is the time interval between health checks
+                type: integer
+              isPaused:
+                description: IsPaused indicates whether the health check is paused
+                type: boolean
+              retries:
+                description: Retries is the number of retries in case of failure
+                type: integer
+              ssl:
+                description: SSL defines whether https must be used
+                type: boolean
+              uri:
+                description: Uri is the URI to be checked
+                type: string
+            type: object
+          status:
+            description: HealthCheckStatus defines the observed state of HealthCheck
+            properties:
+              activeJobs:
+                type: integer
+              cronJobSuspended:
+                description: Status of the CronJob
+                type: boolean
+              lastExecutionTime:
+                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
+                  of cluster Important: Run "make" to regenerate code after modifying
+                  this file Last Execution Time of the CronJob'
+                format: date-time
+                type: string
+            required:
+            - activeJobs
+            - cronJobSuspended
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
