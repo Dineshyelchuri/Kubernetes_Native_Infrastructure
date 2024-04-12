@@ -1,0 +1,88 @@
+pipeline {
+    agent any
+
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    git branch: 'main',
+                    credentialsId: 'jenkinaccesstoken',
+                    url: 'https://github.com/cyse7125-fall2023-group06/webapp.git'
+                }
+            }
+        }
+
+        stage('Authenticate to Quay and Gcloud') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'quay', passwordVariable: 'QUAY_PASSWORD', usernameVariable: 'QUAY_USERNAME')]) {
+                        sh "docker login -u $QUAY_USERNAME -p $QUAY_PASSWORD quay.io"                    
+                    }
+                    withCredentials([file(credentialsId: 'ddaf7e0d-de8c-4e76-9d9b-8f55ca939b15', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                        sh "gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS"
+                        sh "gcloud config set project \$(gcloud projects list --format='value(project_id)' --filter='project_id~^kubernetes-.*')"
+                        sh "gcloud container clusters get-credentials my-gke-cluster --region us-east1"
+                    }
+                }
+            }
+        }
+
+        stage('Build and Push Docker Image') {
+            steps {
+                script {
+                        def semanticReleaseOutput
+                        withCredentials([usernamePassword(credentialsId: 'jenkinaccesstoken', usernameVariable: 'githubUsername', passwordVariable: 'githubToken')]) {
+                        withEnv(["GH_TOKEN=${githubToken}"]){
+                        env.GIT_LOCAL_BRANCH='main'
+                        semanticReleaseOutput = sh(script: 'npx semantic-release', returnStdout: true).trim()
+                            }
+                        }
+                        echo "semantic Release Output: ${semanticReleaseOutput}"
+                        
+                    def latestTag = sh(script: 'git describe --tags --abbrev=0', returnStdout: true).trim()
+                    def hasValidCommits = sh(script: 'git log -n 1 --pretty=%B', returnStdout: true).trim()
+                    echo "Return status of git log: ${hasValidCommits}"
+                    if(hasValidCommits=~ /^(fix|feat|perf):/ && !semanticReleaseOutput.contains('There are no relevant changes, so no new version is released.')){
+                        echo 'valid commits found,  proceeding with docker build...'
+                        sh "rm -f webapp.tgz"
+                        sh "rm -rf webapp"
+                        sh "docker buildx ls"
+                        sh "docker buildx use webapplication"
+                        sh "docker buildx build --push --platform linux/amd64,linux/arm64 --tag quay.io/csye7125ruth/webapp:$latestTag --tag quay.io/csye7125ruth/webapp:latest ."
+                        withCredentials([usernamePassword(credentialsId: 'jenkinaccesstoken', usernameVariable: 'githubUsername', passwordVariable: 'githubToken')]) {
+                            sh "rm -f webapp.tgz"
+                            sh "rm -rf webapp"
+                            def webapp_db_version = sh(script: """curl -s "https://api.github.com/repos/cyse7125-fall2023-group06/webapp-db/releases/latest" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $githubToken" -H "X-GitHub-Api-Version: 2022-11-28" | grep -oP '"tag_name": "\\K[^"]+'""", returnStdout: true).trim()
+                            echo "Latest Webapp version: $latestTag"
+                            echo "Latest Webapp-db version: $webapp_db_version"
+                            def helm_download_link = sh(script: """curl -s "https://api.github.com/repos/cyse7125-fall2023-group06/webapp-helm-chart/releases/latest" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $githubToken" -H "X-GitHub-Api-Version: 2022-11-28" | grep -oP '"url": "\\K[^"]+' | grep "https://api.github.com/repos/cyse7125-fall2023-group06/webapp-helm-chart/releases/assets/*" | tr -d '\n'""", returnStdout: true).trim()                            
+                            sh "wget --auth-no-challenge --header='Accept:application/octet-stream' $helm_download_link --header='Authorization:token $githubToken' -O webapp.tgz"
+                            sh "tar -xzvf webapp.tgz"
+                            withCredentials([usernamePassword(credentialsId: 'webapp-db', passwordVariable: 'DB_PASSWORD', usernameVariable: 'DB_USERNAME')]) {
+                                withCredentials([usernamePassword(credentialsId: 'quay', passwordVariable: 'QUAY_PASSWORD', usernameVariable: 'QUAY_USERNAME')]) {                                
+                                    def customValues = "postgresql.auth.username=$DB_USERNAME,postgresql.auth.password=$DB_PASSWORD,postgresql.networkPolicy.ingressRules.primaryAccessOnlyFrom.podSelector.app=version-webapp-deploy,webapp.image=quay.io/csye7125ruth/webapp:$latestTag,regcred.username=$QUAY_USERNAME,regcred.password=$QUAY_PASSWORD,flyway.image=quay.io/csye7125ruth/webapp-db:$webapp_db_version"
+                                    sh "kubectl create ns webapp --dry-run=client -o yaml | kubectl apply -f -"
+                                    sh "helm upgrade --install version ./webapp -n webapp --set $customValues"
+                                }                            
+                            }                   
+                        }                                                
+                    }
+                    else{
+                        echo 'No valid commits found, skipping docker build...'
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            withCredentials([usernamePassword(credentialsId: 'quay', passwordVariable: 'QUAY_PASSWORD', usernameVariable: 'QUAY_USERNAME')]) {
+                sh 'docker logout $QUAY_USERNAME'
+                sh 'gcloud auth revoke'
+                sh 'echo "deployment done."'
+            }
+        }
+    }
+}
