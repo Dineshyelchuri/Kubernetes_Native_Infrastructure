@@ -1,0 +1,21 @@
+Thank you for installing {{ .Chart.Name }} chart.
+Your release is named {{ .Release.Name }}.
+
+To learn more about the release, try:
+  $ helm status {{ .Release.Name }}
+  $ helm get all {{ .Release.Name }}
+
+To Uninstall the chart, try
+  $ helm uninstall {{ .Release.Name }}
+
+Please wait a few seconds until the {{ .Chart.Name }} chart is fully installed.
+
+echo http://$SERVICE_IP/[API_ROUTE]
+
+After installation is complete, you can access your webapp by running this command:
+
+kubectl get --namespace {{ .Release.Namespace }} service {{ .Release.Name }}-webapp-service
+
+and then entering the External IP address you get, into your postman's address bar.
+
+NOTE: It may take a few minutes for the LoadBalancer IP to be available.

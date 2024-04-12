@@ -1,0 +1,21 @@
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: {{ .Release.Name }}-db-network-policy
+# #   namespace: {{ .Values.webapp.namespace }}
+# spec:
+#   podSelector:
+#     matchLabels:
+#       app.kubernetes.io/name: postgresql
+#       app.kubernetes.io/instance: {{ .Release.Name }}
+#   policyTypes:
+#     - Ingress
+#     - Egress
+#   ingress:
+#     - from:
+#         - podSelector:
+#             matchLabels:
+#               app: {{ .Release.Name }}-webapp-deploy
+#       ports:
+#         - protocol: TCP
+#           port: 5432

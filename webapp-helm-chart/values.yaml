@@ -1,0 +1,67 @@
+# Default values for webapp-helm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+deployment:
+  replicaCount: 3
+  minReadySeconds: 30
+  progressDeadlineSeconds: 40
+  strategy:
+    type: RollingUpdate
+    maxSurge: 1
+    maxUnavailable: 0
+  limits:
+    memoryLimit: "512Mi"
+    cpuLimit: "0.6"
+  requests:
+    memoryRequest: "128Mi"
+    cpuRequest: "0.2"
+
+webapp:
+  # namespace: webapp
+  image: quay.io/csye7125ruth/webapp:latest
+  crNamespace: kube-operator-system
+  containerPort: 3000
+
+flyway:
+  image: quay.io/csye7125ruth/webapp-db:latest
+
+service:
+  type: ClusterIP
+  port: 80
+
+db:
+  schema: app
+
+regcred:
+  username: ""
+  password: ""
+
+postgresql:
+  auth:
+    username: ""
+    password: ""
+    database: app
+  networkPolicy:
+    enabled: true
+    ingressRules:
+      primaryAccessOnlyFrom:
+        enabled: true
+        podSelector:
+          app: version-webapp-deploy
+    egressRules:
+      denyConnectionsToExternal: true
+
+
+defaultLimits:
+  cpu: 1000m
+  memory: 1Gi
+defaultRequests:
+  cpu: 10m
+  memory: 64Mi
+
+quota:
+  cpuRequests: 10
+  memoryRequests: 12Gi
+  cpuLimits: 20
+  memoryLimits: 24Gi

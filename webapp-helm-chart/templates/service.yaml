@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ .Release.Name }}-webapp-service
+  name: {{ .Release.Name }}-webapp-service
+  # namespace: {{ .Values.webapp.namespace }}
+spec:
+  selector:
+    app: {{ .Release.Name }}-webapp-deploy
+  ports:
+  - port: {{ .Values.service.port }}
+    name: http
+    protocol: TCP
+    targetPort: {{ .Values.webapp.containerPort }}
+  type: {{ .Values.service.type }}

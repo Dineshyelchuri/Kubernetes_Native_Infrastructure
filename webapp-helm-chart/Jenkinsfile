@@ -1,0 +1,67 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    git branch: 'main',
+                    credentialsId: 'jenkinaccesstoken',
+                    url: 'https://github.com/cyse7125-fall2023-group06/webapp-helm-chart.git'
+                }
+            }
+        }
+
+        stage('release') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'jenkinaccesstoken', usernameVariable: 'githubUsername', passwordVariable: 'githubToken')]) {
+                        withEnv(["GH_TOKEN=${githubToken}"]){
+                            env.GIT_LOCAL_BRANCH='main'
+                            sh "rm -f webapp.tgz"
+                            sh "rm -rf webapp"
+                            sh "npx semantic-release"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Helm Chart') {
+            steps {
+                script {
+                    withCredentials([file(credentialsId: 'ddaf7e0d-de8c-4e76-9d9b-8f55ca939b15', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                        sh "gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS"
+                        sh "gcloud config set project \$(gcloud projects list --format='value(project_id)' --filter='project_id~^kubernetes-.*')"
+                        sh "gcloud container clusters get-credentials my-gke-cluster --region us-east1"
+                    }
+                    withCredentials([usernamePassword(credentialsId: 'jenkinaccesstoken', usernameVariable: 'githubUsername', passwordVariable: 'githubToken')]) {
+                        sh "rm -f webapp.tgz"
+                        sh "rm -rf webapp"
+                        def helm_download_link = sh(script: """curl -s "https://api.github.com/repos/cyse7125-fall2023-group06/webapp-helm-chart/releases/latest" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $githubToken" -H "X-GitHub-Api-Version: 2022-11-28" | grep -oP '"url": "\\K[^"]+' | grep "https://api.github.com/repos/cyse7125-fall2023-group06/webapp-helm-chart/releases/assets/*" | tr -d '\n'""", returnStdout: true).trim()
+                        sh "wget --auth-no-challenge --header='Accept:application/octet-stream' $helm_download_link --header='Authorization:token $githubToken' -O webapp.tgz"
+                        sh "tar -xzvf webapp.tgz"                        
+                    }
+                    withCredentials([usernamePassword(credentialsId: 'webapp-db', passwordVariable: 'DB_PASSWORD', usernameVariable: 'DB_USERNAME')]) {
+                        withCredentials([usernamePassword(credentialsId: 'quay', passwordVariable: 'QUAY_PASSWORD', usernameVariable: 'QUAY_USERNAME')]) {
+                            def customValues = "postgresql.auth.username=$DB_USERNAME,postgresql.auth.password=$DB_PASSWORD,postgresql.networkPolicy.ingressRules.primaryAccessOnlyFrom.podSelector.app=version-webapp-deploy,regcred.username=$QUAY_USERNAME,regcred.password=$QUAY_PASSWORD"
+                            sh "kubectl create ns webapp --dry-run=client -o yaml | kubectl apply -f -"
+                            sh "kubectl label ns webapp istio-injection=enabled"
+                            sh "helm upgrade --install version ./webapp -n webapp --set $customValues"
+                        }                        
+                    }                    
+                }
+            }
+        }
+
+        stage('post-release') {
+            steps {
+                script 
+                {
+                    sh 'gcloud auth revoke'
+                    sh 'echo "Done deployment."'
+                }
+            }
+        }
+    }
+}
