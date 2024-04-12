@@ -1,10 +1,10 @@
 # CSYE7125 - Advanced Cloud Computing
 
-# This is a consolidated Repository of the organization https://github.com/csye7125-fall2023-group06
+# This is a consolidated Repository for  the organization https://github.com/csye7125-fall2023-group06
 
 This repository contains all sub repositories created during the kubernetes Native Infrastructure project 
 
-Tech Stack
+#Tech Stack
 
 1)Node js for web application
 
