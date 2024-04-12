@@ -1,0 +1,18 @@
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: {{ .Values.vs.name }}
+#   namespace: istio-system
+spec:
+  hosts:
+    - {{ .Values.ingress.host | quote }}
+  gateways:
+    - {{ .Values.ingress.name }}
+  http:
+  - route:    
+    - destination:
+        port:
+          number: {{ .Values.webapp.servicePort }}
+        host: {{ .Values.webapp.service }}
+        subset: {{ .Values.webapp.subset }}
+      weight: {{ .Values.vs.destinationWeight }}

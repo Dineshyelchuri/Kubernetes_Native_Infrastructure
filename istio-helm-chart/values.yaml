@@ -1,0 +1,28 @@
+kiali-server:
+  # istio_namespace: istio-system
+  auth:
+    strategy: anonymous
+gateway:
+  name: istio-ingressgateway
+
+dr:
+  name: webapp-dr
+
+vs:
+  name: webapp-vs
+  destinationWeight: 100
+
+ingress:
+  name: ingress-gateway-configuration
+  protocol: HTTP
+  protocolName: http
+  host: "*"
+  selectors:
+    istio: ingressgateway
+
+
+webapp:
+  service: version-webapp-service.webapp.svc.cluster.local
+  servicePort: 80
+  deploymentName: version-webapp-deploy
+  subset: original

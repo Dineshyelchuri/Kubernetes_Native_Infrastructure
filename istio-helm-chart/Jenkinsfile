@@ -1,0 +1,63 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    git branch: 'main',
+                    credentialsId: 'jenkinaccesstoken',
+                    url: 'https://github.com/cyse7125-fall2023-group06/istio-helm-chart.git'
+                }
+            }
+        }
+
+        stage('release') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'jenkinaccesstoken', usernameVariable: 'githubUsername', passwordVariable: 'githubToken')]) {
+                        withEnv(["GH_TOKEN=${githubToken}"]){
+                            env.GIT_LOCAL_BRANCH='main'
+                            sh "rm -f istio-helm-chart.tgz"
+                            sh "rm -rf istio-helm-chart"
+                            sh "npx semantic-release"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Helm Chart') {
+            steps {
+                script {
+                    withCredentials([file(credentialsId: 'ddaf7e0d-de8c-4e76-9d9b-8f55ca939b15', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                        sh "gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS"
+                        sh "gcloud config set project \$(gcloud projects list --format='value(project_id)' --filter='project_id~^kubernetes-.*')"
+                        sh "gcloud container clusters get-credentials my-gke-cluster --region us-east1"
+                    }
+                    withCredentials([usernamePassword(credentialsId: 'jenkinaccesstoken', usernameVariable: 'githubUsername', passwordVariable: 'githubToken')]) {
+                        sh "rm -f istio-helm-chart.tgz"
+                        sh "rm -rf istio-helm-chart"
+                        def helm_download_link = sh(script: """curl -s "https://api.github.com/repos/cyse7125-fall2023-group06/istio-helm-chart/releases/latest" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $githubToken" -H "X-GitHub-Api-Version: 2022-11-28" | grep -oP '"url": "\\K[^"]+' | grep "https://api.github.com/repos/cyse7125-fall2023-group06/istio-helm-chart/releases/assets/*" | tr -d '\n'""", returnStdout: true).trim()
+                        sh "wget --auth-no-challenge --header='Accept:application/octet-stream' $helm_download_link --header='Authorization:token $githubToken' -O istio-helm-chart.tgz"
+                        sh "tar -xzvf istio-helm-chart.tgz"                        
+                    }
+                    sh "kubectl create ns istio-system --dry-run=client -o yaml | kubectl apply -f -"
+                    sh "helm upgrade --install istio ./istio-helm-chart -n istio-system"
+                    sh "helm repo add istio https://istio-release.storage.googleapis.com/charts"
+                    sh "helm upgrade --install istio-ingressgateway istio/gateway -n istio-system --set name=istio-ingressgateway"
+                    sh "kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.20/samples/addons/prometheus.yaml -n istio-system"
+                }
+            }
+        }
+
+        stage('post-release') {
+            steps {
+                script 
+                {
+                    sh 'gcloud auth revoke'
+                }
+            }
+        }
+    }
+}

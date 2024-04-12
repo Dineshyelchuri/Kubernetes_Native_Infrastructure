@@ -1,0 +1,30 @@
+jenkins:
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+       - id: dinesh 
+         password: Fall@2022001 
+  authorizationStrategy:
+    globalMatrix:
+      permissions:
+        - "Overall/Administer:dinesh"
+        - "Overall/Read:authenticated"
+credentials:
+  system:
+    domainCredentials:
+    - credentials:
+      - usernamepassword:
+          scope: GLOBAL
+          id: "jenkinaccesstoken"
+          username: "yelchuridinesh"
+          password: ""
+          description: "default credentials."
+      - usernamepassword:
+          scope: GLOBAL
+          id: "quay"
+          username: "dineshyelchuri"
+          password: ""
+          description: "default credentials."
+jobs:
+- file: /var/lib/jenkins/seedJob.groovy
