@@ -1,21 +1,14 @@
 # CSYE7125 - Advanced Cloud Computing
-# kafka-helm-chart
-This helm chart installs all the necessary kubernetes objects required to run the kafka cluster.
-##
-Chart dependencies:
-- PostgreSql
-- Kafka
-##
-To install the helm chart, run the following command:
-```
-helm install [release_name] [./chart_folder]
-```
-##
-To Uninstall the chart, try
-```
-helm uninstall [release_name]
-```
-##
-This Kafka helm chart also installs necessary kubernetes objects required to run the kafka consumer which reads the data from the healthcheck topic and writes to the Postgresql database.
-
-NOTE: It may take a while for the Kafka cluster to get set up completely which includes three controllers/brokers.
+# This is a consolidated Repository of the organization https://github.com/csye7125-fall2023-group06
+This repository contains all sub repositories created during the kubernetes Native Infrastructure project 
+Tech Stack
+1)Node js for web application 
+2) Golang for writing Kubernetes Operator
+3) Terraform for creating GKE (Google kuerbenetes Engine) cluster   
+4) AWS AMI for Images
+5) Kafka for the data streaming
+6) Istio service mesh
+7) Groovy and JCASC for Jenkins CI/CD pipelines
+8) Github Actions for unit test cases and Releases
+9) AWS for Jenkins Infrastructure using Terraform 
+10) Postgre SQL for databases
